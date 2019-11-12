@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Configuration;
+using Microsoft.EntityFrameworkCore;
 
 namespace TweeterSearchApp
 {
@@ -29,7 +30,34 @@ namespace TweeterSearchApp
             await auth.AuthorizeAsync();
 
             var twitterCtx = new TwitterContext(auth);
-            await SearchDemo.RunAsync(twitterCtx);
+            ulong lastTweetId = 0;
+            var tweetsAmount = 0;
+            while (tweetsAmount < 3200)
+            {
+                using (var context = new TweetsDbContext())
+                {
+                    lastTweetId = await context.Tweets.CountAsync() > 0 ? (ulong) await context.Tweets.MaxAsync(tweet => tweet.TweetId) : 0;
+                    var tweets = await SearchContext.DoSearchAsync(twitterCtx, lastTweetId);
+                    if (tweets.Count <= 0)
+                    {
+                        break;
+                    }
+                    context.Tweets.AddRange(tweets);
+                    await context.Database.OpenConnectionAsync();
+                    try
+                    {
+                        await context.Database.ExecuteSqlInterpolatedAsync($"SET IDENTITY_INSERT dbo.Tweets ON");
+                        await context.SaveChangesAsync();
+                        await context.Database.ExecuteSqlInterpolatedAsync($"SET IDENTITY_INSERT dbo.Tweets OFF");
+                    }
+                    finally
+                    {
+                        await context.Database.CloseConnectionAsync();
+                    }
+                    tweetsAmount += tweets.Count;
+                }
+            }
+
         }
 
         static IAuthorizer DoSingleUserAuth()

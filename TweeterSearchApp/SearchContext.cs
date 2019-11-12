@@ -4,17 +4,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using TweeterSearchApp.Models;
 
 namespace TweeterSearchApp
 {
-    public class SearchDemo
+    public class SearchContext
     {
-        internal static async Task RunAsync(TwitterContext twitterCtx)
-        {
-            await DoSearchAsync(twitterCtx);
-        }
-
-        static async Task DoSearchAsync(TwitterContext twitterCtx)
+        public static async Task<IList<Tweet>> DoSearchAsync(TwitterContext twitterCtx, ulong lastId)
         {
             string searchTerm = "avianca";
 
@@ -25,17 +21,22 @@ namespace TweeterSearchApp
                      search.Query == searchTerm &&
                      search.IncludeEntities == true &&
                      search.TweetMode == TweetMode.Extended &&
-                     search.Count == 1500 
+                     search.Count == 100 &&
+                     search.SinceID == lastId
                  select search)
                  .FirstOrDefaultAsync();
-
+            var tweetList = new List<Tweet>();
             if (searchResponse?.Statuses != null)
                 searchResponse.Statuses.ForEach(tweet =>
-                    Console.WriteLine(
-                        "\n  User: {0} ({1})\n  Tweet: {2}",
-                        tweet.User.ScreenNameResponse,
-                        tweet.User.UserIDResponse,
-                        tweet.Text ?? tweet.FullText));
+                {
+                    tweetList.Add(new Tweet
+                    {
+                        UnsignedTweetId = tweet.StatusID,
+                        Text = tweet.FullText,
+                        CreatedAt = tweet.CreatedAt
+                    });
+                });
+            return tweetList;
         }
     }
 }
